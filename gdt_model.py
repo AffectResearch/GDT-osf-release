@@ -8,7 +8,7 @@ import time
 
 class AffectModel:
 
-    def __init__(self, w=1.0, B0=0.5, pi=1.0, max_discrepancy=None): # Maximum discrepancy: a cap so that discrepancy cannot grow infintely
+    def __init__(self, w=1.0, B0=0.5, pi=1.0, max_discrepancy=None): # Maximum discrepancy: a cap so that discrepancy cannot grow infintely; TODO: Feed this in from the environment?
             self.w = w          # Goal Value/Importance: Relative importance of a goal; goal_importance in Tomis model
             self.B0 = B0        # Affect at goal completion
             self.pi = pi        # Expectedness/Subjective Probability of a future/anticipated state; probability in Tomis Model
@@ -19,6 +19,7 @@ class AffectModel:
         """
         Calculates the sum of the feature differences as discrepancy, 
         for those features in the goal that are not set to None (those are ignored, this allows for multiple goals later)
+        As for now there are no environments with features yet
         a = state feature; TODO rename it to s? But s is salience...
         b = goal feature; TODO rename it to g
         Remark: No homeostatic goals yet, only positive achievement goals
@@ -79,7 +80,7 @@ class SalienceManager:
     # }) 
     
     # initialize based on dictionary
-    def __init__(self, initial_saliences):
+    def __init__(self, initial_saliences): # initial_saliences are the once fed in through the agent architecture (or the dictionary above)
         self.saliences = initial_saliences
         self.normalize()
     
@@ -88,7 +89,7 @@ class SalienceManager:
         total = sum(self.saliences.values())
         if total == 0:
             return  # I don't know but it cannot become zero
-        for k in self.saliences:
+        for k in self.saliences: # k being the salience of each affect component; taken from Tomis Code
             self.saliences[k] /= total
 
     # Get function to retrieve salience
@@ -101,10 +102,10 @@ class SalienceManager:
         self.normalize()
 
 
-# ---- AGENT COGNITIVE ARCHITECTURE ---- TODO: this should also become a class at some point
+# ---- AGENT DECISION MAKING ---- 
 
 class DecisionMaking:
-    def __init__(self, affect_model, salience_manager, memory, planning):
+    def __init__(self, affect_model, salience_manager, memory, planning): # the features fed in there have to be initialized correctly in the agent class below
         self.affect_model = affect_model
         self.salience_manager = salience_manager
         self.memory = memory
@@ -113,22 +114,23 @@ class DecisionMaking:
     # 1. Decide
     def decide(self, actions, state, goal, prev_d):
         # This simulates a very simple policy: the agent takes random actons when there is discrepancy otherwise it chooses to "stay"
-        d = self.affect_model.discrepancy(state, goal)
+        d = self.affect_model.discrepancy(state, goal) # first the decision mechanism retrieves d and delta_d from the affect calculation
         delta_d = self.affect_model.delta_discrepancy(prev_d, d)
 
         # Choose action
         if d>0:
-            if self.planning:
+            if self.planning: # if we have a planning agent, we will use the planning
                 action, anticipated_discrepancy = self.plan(state, goal, depth=0)
                 if action is None: # there is no plan, so just do random stuff again
                     action = random.choice(actions)
-            else: 
+            else: # if we have no planning agent, we will use random choice TODO: I think as soon as we have a learning agent this has to be changed
                 action=random.choice(actions)
         else:
-            action="stay"
+            action="stay" # if the discrepancy is already 0 we should stay
 
         affect = self.affect_model.combined_affect(d=d, delta_d=delta_d, s0=self.salience_manager.retrieve("goal_completion"), s1=self.salience_manager.retrieve("discrepancy"), s2=self.salience_manager.retrieve("delta_discrepancy"))
-        
+        #calculating the combined affect just so we have it
+
         return action, affect, d
 
     # 2. Act
@@ -148,8 +150,7 @@ class DecisionMaking:
         elif action == "stay":
             newState=newState
 
-        # Possibility to update saliences after taking an action (here i based it on actions, but we can do that based on what we want)
-
+        # Possibility to update saliences after taking an action (here i based it on actions, but we can do that based on what we want); TODO: Make this more flexible
         salience_updates = {
             "up": {"goal_completion": 0.05},
             "down": {"discrepancy": 0.02},
@@ -168,7 +169,7 @@ class DecisionMaking:
     # 3. Plan
     def plan(self, state, goal, depth):
         if depth > 3: # deth of planning is limited to prevent infinite planning; TODO: substitute 3 by max_depth variable?
-            return None, self.affect_model.discrepancy(state, goal)
+            return None, self.affect_model.discrepancy(state, goal) # TODO: discrepancy could be a variable defined before, to make it cleaner
         
         if tuple(state) in self.memory.prediction_memory:
             anticipated_actions = self.memory.prediction_memory[tuple(state)] # list of anticipated actions (with states) if there are memories
@@ -179,10 +180,10 @@ class DecisionMaking:
             for anticipated_state, probability in anticipated_states.items():
                 if self.affect_model.discrepancy(anticipated_state, goal) == 0: 
                     return action, self.affect_model.discrepancy(anticipated_state, goal)  # goal is achieved, returns action and discrepancy
-                
-            return self.plan(anticipated_state, goal, depth + 1)
+
+            return self.plan(anticipated_state, goal, depth + 1) # TODO: This is wrong somehow, but I don't understand recursion enough with this probabilistic dict
         
-        anticipated_discrepancy = self.affect_model.discrepancy(anticipated_state, goal)
+        anticipated_discrepancy = self.affect_model.discrepancy(anticipated_state, goal) # I am unsure if we also need to calculate an anticipated affect. I would say no
         return action, anticipated_discrepancy
 
 
@@ -203,6 +204,7 @@ class Memory:
         # Also calls the update function to caclulate and store probabities
         # Edit: changed to probabilistic settings
         # Datastructure is a nested dictionary
+        # TODO: Clean up that whole tuple(state) mess
         if tuple(state) not in self.transition_memory: # makes sure not to use something that has never been seen before
             self.transition_memory[tuple(state)]= {} # initializes the dictionary if it doesn't exist yet
 
@@ -211,7 +213,7 @@ class Memory:
 
         self.transition_memory[tuple(state)][action][tuple(newState)] += 1 # counts transitions and stores them in transition_memory
 
-        # experience_memory.append((tuple(state), action, tuple(newState))) # TODO: Make this so that we can distinguish beteen episodes and selectively recall them
+        # experience_memory.append((tuple(state), action, tuple(newState))) # TODO: Make this so that we can distinguish between episodes and selectively recall them; I don't know how to do this yet
 
 
         # Update probabilities after logging
@@ -222,9 +224,9 @@ class Memory:
         total = sum(counts.values())
         if tuple(state) not in self.prediction_memory: # makes sure not to use something that has never been seen before
             self.prediction_memory[tuple(state)] = {} # initializes the dictionary if it doesn't exist yet
-        self.prediction_memory[tuple(state)][action] = {
-            newState: count / total for newState, count in counts.items()
-        } # updates prediction memory which then can be used to take decisions or plan
+        for newState, count in counts.items():
+            probability = count / total
+            self.prediction_memory[tuple(state)][action][newState] = probability # updates prediction_memory to probabilities which then can be used to take decisions or plan
 
 
 # ---- OVERALL AGENT ----
@@ -237,7 +239,7 @@ class Agent:
             "goal_completion": 0.3,
             "discrepancy": 0.4,
             "delta_discrepancy": 0.3
-        })
+        }) # Maybe this should be fed in with the environment?
         self.memory = Memory()
         self.decision_making = DecisionMaking(
             affect_model=self.affect_model,
