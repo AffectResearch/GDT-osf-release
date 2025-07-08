@@ -8,10 +8,10 @@ import time
 
 class AffectModel:
 
-    def __init__(self, w=1.0, B0=0.5, pi=1.0, max_discrepancy=None): # Maximum discrepancy: a cap so that discrepancy cannot grow infintely; TODO: Feed this in from the environment?
-            self.w = w          # Goal Value/Importance: Relative importance of a goal; goal_importance in Tomis model
-            self.B0 = B0        # Affect at goal completion
-            self.pi = pi        # Expectedness/Subjective Probability of a future/anticipated state; probability in Tomis Model
+    def __init__(self, w=1.0, B0=0.5, pi=1.0, max_discrepancy=1): # Maximum discrepancy: a cap so that discrepancy cannot grow infintely; TODO: Feed this in from the environment?
+            self.w = w          # Goal Value/Importance: Relative importance of a goal; goal_importance in Tomis model; TODO: Not initialize it here
+            self.B0 = B0        # Baseline Affect
+            #self.pi = pi        # Expectedness/Subjective Probability of a future/anticipated state; probability in Tomis Model; remove pi?
             self.max_discrepancy = max_discrepancy
 
     # 1. Calculation of discrepancy
@@ -24,7 +24,7 @@ class AffectModel:
         b = goal feature; TODO rename it to g
         Remark: No homeostatic goals yet, only positive achievement goals
         """
-        d = sum(abs(a - b) if b is not None else 0 for a, b in zip(state, goal))
+        d = sum(abs(a - b) if b is not None else 0 for a, b in zip(state, goal)) # TODO: Discuss distance function
         if self.max_discrepancy is not None:
             d = min(d, self.max_discrepancy)
         return d
@@ -32,7 +32,7 @@ class AffectModel:
 
     # 2. Calculation of change in discrepancy
 
-    def delta_discrepancy (self, prev_d, current_d):
+    def delta_discrepancy (self, prev_d, current_d): # Where do they come from? maybe store them at each time step
         delta_d = prev_d - current_d
         # TODO: Right now I dropped the normalization of this delta_d that we had noted down in the original version of the code. 
         # it was dropped because it seemed not to fit anymore with the code that we had written (in my understanding, please correct me)
@@ -42,15 +42,15 @@ class AffectModel:
 
     # a) Affect from goal completion (baseline affect)
     def affect_from_completion(self, s0):
-        return s0 * self.w * self.B0
+        return s0 * self.w * self.B0 # insert an if clause if goal is not achieved
 
     # b) Affect from Discrepancy
     def affect_discrepancy(self, d, s1):
-        return s1 * self.w * (self.B0 + d)
+        return -s1 * self.w * (self.B0 + d) # removed beta here?
 
     # c) Affect from Change in Discrepancy
     def affect_delta_discrepancy(self, delta_d, s2):
-        return -s2 * self.w * (self.B0 + delta_d)
+        return -s2 * self.w * (self.B0 + delta_d) # removed beta here?
 
     # d) Calculation of Combined Affect
     def combined_affect(self, d, delta_d, s0, s1, s2):
@@ -61,11 +61,12 @@ class AffectModel:
         a_discr = self.affect_discrepancy(d, s1)
         a_deltadiscr = self.affect_delta_discrepancy(delta_d, s2)
 
-        a_total = a0 - a_discr - a_deltadiscr
+        a_total = a0 + a_discr + a_deltadiscr
 
-        if self.pi is not None:
-            return a_total * self.pi
-        return a_total
+        # if self.pi is not None:
+        #     return a_total * self.pi
+        # return a_total
+        # this needs to be in the planning function 
 
 
 # ---- SALIENCE MANAGER ----
