@@ -33,7 +33,7 @@ class AffectModel:
     # 2. Calculation of change in discrepancy
 
     def delta_discrepancy (self, prev_d, current_d): # Where do they come from? maybe store them at each time step
-        delta_d = prev_d - current_d
+        delta_d = prev_d - current_d # add current_d = d ; TODO: Store discrepancy so we can calculate prev_d and delta_d
         # TODO: Right now I dropped the normalization of this delta_d that we had noted down in the original version of the code. 
         # it was dropped because it seemed not to fit anymore with the code that we had written (in my understanding, please correct me)
         return delta_d
@@ -46,11 +46,11 @@ class AffectModel:
 
     # b) Affect from Discrepancy
     def affect_discrepancy(self, d, s1):
-        return -s1 * self.w * (self.B0 + d) # removed beta here?
+        return -s1 * self.w * d 
 
     # c) Affect from Change in Discrepancy
     def affect_delta_discrepancy(self, delta_d, s2):
-        return -s2 * self.w * (self.B0 + delta_d) # removed beta here?
+        return s2 * self.w * delta_d
 
     # d) Calculation of Combined Affect
     def combined_affect(self, d, delta_d, s0, s1, s2):
