@@ -8,7 +8,7 @@ import time
 
 class AffectModel:
 
-    def __init__(self, w=1.0, B0=0.5, pi=1.0, max_discrepancy=1): # Maximum discrepancy: a cap so that discrepancy cannot grow infintely; TODO: Feed this in from the environment?
+    def __init__(self, w=1.0, B0=0.5, pi=1.0, max_discrepancy=None): # Maximum discrepancy: a cap so that discrepancy cannot grow infintely; TODO: Feed this in from the environment?
             self.w = w          # Goal Value/Importance: Relative importance of a goal; goal_importance in Tomis model; TODO: Not initialize it here
             self.B0 = B0        # Baseline Affect
             #self.pi = pi        # Expectedness/Subjective Probability of a future/anticipated state; probability in Tomis Model; remove pi?
@@ -24,6 +24,10 @@ class AffectModel:
         b = goal feature; TODO rename it to g
         Remark: No homeostatic goals yet, only positive achievement goals
         """
+        if not isinstance(state, (list, tuple)):
+            state = [state]
+        if not isinstance(goal, (list, tuple)):
+            goal = [goal]
         d = sum(abs(a - b) if b is not None else 0 for a, b in zip(state, goal)) # TODO: Discuss distance function
         if self.max_discrepancy is not None:
             d = min(d, self.max_discrepancy)
@@ -172,8 +176,10 @@ class DecisionMaking:
         if depth > 3: # deth of planning is limited to prevent infinite planning; TODO: substitute 3 by max_depth variable?
             return None, self.affect_model.discrepancy(state, goal) # TODO: discrepancy could be a variable defined before, to make it cleaner
         
-        if tuple(state) in self.memory.prediction_memory:
-            anticipated_actions = self.memory.prediction_memory[tuple(state)] # list of anticipated actions (with states) if there are memories
+        k = self.memory._key(state)
+
+        if k in self.memory.prediction_memory:
+            anticipated_actions = self.memory.prediction_memory[k] # list of anticipated actions (with states) if there are memories
         else:
             anticipated_actions = {} # empty list if there are no memories
 
@@ -198,6 +204,8 @@ class Memory:
         self.experience_memory = [] # Stores trajectories
         self.prediction_memory = {} # Stores probabilities for transitions. THIS should be used for decision making and planning
 
+    def _key(self, s):
+        return (s,) if not isinstance(s, (list, tuple)) else tuple(s)
 
 
     def store(self, state, action, newState):
@@ -206,13 +214,14 @@ class Memory:
         # Edit: changed to probabilistic settings
         # Datastructure is a nested dictionary
         # TODO: Clean up that whole tuple(state) mess
-        if tuple(state) not in self.transition_memory: # makes sure not to use something that has never been seen before
-            self.transition_memory[tuple(state)]= {} # initializes the dictionary if it doesn't exist yet
+        k = self._key(state)
+        if k not in self.transition_memory: # makes sure not to use something that has never been seen before
+            self.transition_memory[k]= {} # initializes the dictionary if it doesn't exist yet
 
-        if action not in self.transition_memory[tuple(state)]: # makes sure not to use something that has never been seen before
-            self.transition_memory[tuple(state)][action] = defaultdict(int) # initializes the dictionary if it doesn't exist yet
+        if action not in self.transition_memory[k]: # makes sure not to use something that has never been seen before
+            self.transition_memory[k][action] = defaultdict(int) # initializes the dictionary if it doesn't exist yet
 
-        self.transition_memory[tuple(state)][action][tuple(newState)] += 1 # counts transitions and stores them in transition_memory
+        self.transition_memory[k][action][self._key(newState)] += 1 # counts transitions and stores them in transition_memory
 
         # experience_memory.append((tuple(state), action, tuple(newState))) # TODO: Make this so that we can distinguish between episodes and selectively recall them; I don't know how to do this yet
 
@@ -221,21 +230,58 @@ class Memory:
         self.update_transition_probabilities(state, action)
 
     def update_transition_probabilities(self, state, action): # Normalizes transitions so that they can be used as probabilities
-        counts = self.transition_memory[tuple(state)][action]
+        k = self._key(state)
+        counts = self.transition_memory[k][action]
         total = sum(counts.values())
-        if tuple(state) not in self.prediction_memory: # makes sure not to use something that has never been seen before
-            self.prediction_memory[tuple(state)] = {} # initializes the dictionary if it doesn't exist yet
+        if k not in self.prediction_memory:
+            self.prediction_memory[k] = {}
+        if action not in self.prediction_memory[k]:
+            self.prediction_memory[k][action] = {}
         for newState, count in counts.items():
-            probability = count / total
-            self.prediction_memory[tuple(state)][action][newState] = probability # updates prediction_memory to probabilities which then can be used to take decisions or plan
+            self.prediction_memory[k][action][newState] = count / total if total > 0 else 0.0
+
+# ---- ENVIRONMENTs ----
+# Simple Money world environment
+
+class MoneyMDPEnv:
+    # States are 0 to 5 (5 is terminal)
+    # Actions: "go" (to the right), "stay"
+    # Rewards: +1 for every go, 0 otherwise
+
+    @property
+    def actions(self):
+        return ["go", "stay"]
+
+    def __init__(self, max_state=5):
+        self.state = 0
+        self.max_state = max_state
+
+    def step(self, action): 
+        prev = self.state
+        if action == "go" and self.state < self.max_state:
+            self.state += 1
+        elif action == "stay":
+            pass
+        if self.state > prev:
+            reward = 1
+        else:
+            reward = 0
+        done = self.state == self.max_state
+        return self.state, reward, done
+    
+    def reset(self):
+        self.state = 0
+        return self.state
+
+
 
 
 # ---- OVERALL AGENT ----
 # Agent class with all the core components
  
 class Agent:
-    def __init__(self, planning):
-        self.affect_model = AffectModel()
+    def __init__(self, planning, env):
+        self.affect_model = AffectModel(max_discrepancy=None)
         self.salience_manager = SalienceManager({
             "goal_completion": 0.3,
             "discrepancy": 0.4,
@@ -246,44 +292,45 @@ class Agent:
             affect_model=self.affect_model,
             salience_manager=self.salience_manager,
             memory=self.memory,
-            planning=self.planning
+            planning=planning
         )
-        self.planning = planning
+        
 
-        self.state = [0, 0]  # Only [x, y] for now; TODO: Make this modular
-        self.goal = [None, None]  # Goal on position only; TODO: Make this modular
-        self.actions = ["up", "down", "left", "right", "stay"] # TODO: Make this modular
+        self.planning = planning
+        self.env = env
+        self.state = self.env.reset()   # scalar 0..5
+        self.goal = 5                   # scalar goal (€5)
+        self.actions = self.env.actions # ["go","stay"]
 
         self.prev_d = self.affect_model.discrepancy(self.state, self.goal)
 
     def run(self):
         while True:
             print(f"Current state: {self.state}")
-
-            action, affect, discrepancy = self.decision_making.decide(
+            action, affect, d = self.decision_making.decide(
                 actions=self.actions,
                 state=self.state,
                 goal=self.goal,
-                prev_d=self.prev_d,
-                affect_model=self.affect_model,
-                salience_manager=self.salience_manager
+                prev_d=self.prev_d
             )
+            print(f"Chosen action: {action}, Affect: {affect:.2f}, Discrepancy: {d:.2f}")
 
-            print(f"Chosen action: {action}, Affect: {affect:.2f}")
-
-            new_state = self.decision_making.do_action(
-                action, self.state, self.salience_manager
-            )
+            new_state, reward, done = self.env.step(action)
             self.memory.store(self.state, action, new_state)
 
-            self.prev_d = discrepancy
+            self.prev_d = d
             self.state = new_state
 
-            time.sleep(0.5)
+            if done:
+                print("Reached goal (5). Episode finished.")
+                break
+
+            time.sleep(0.3)
 
 
 
-agent = Agent(planning=True)
+env = MoneyMDPEnv(max_state=5)
+agent = Agent(planning=True, env=env)
 agent.run()
 
 
