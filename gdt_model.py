@@ -458,7 +458,7 @@ class Agent:
         self.env = env
         self.state = self.env.reset()   # scalar 0..5
         self.goal = 5                   # scalar goal (€5)
-        self.actions = self.env.actions # ["go","stay"]
+        self.actions = self.env.actions # ["go", "back", "stay"]
 
         self.prev_d = self.affect_model.discrepancy(self.state, self.goal)
 
