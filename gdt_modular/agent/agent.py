@@ -284,6 +284,8 @@ class Agent:
         self.state = self.env.reset()
         self.goal = goal
         self.actions = self.env.actions
+        self.sleep_s = 0.3 
+
 
         # wire the discrepancy plugin (optional)
         self.affect_model.env = self.env
