@@ -1,9 +1,11 @@
  # gdt_modular/run.py
-from .envs.money_env import MoneyMDPEnv, money_discrepancy
-from .agent.agent import Agent
+
 import time
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+
+from envs.money_env import MoneyMDPEnv, money_discrepancy
+from agent.agent import Agent, AffectModel, SalienceManager, Memory, DecisionMaking
 
 def run(self):
     while True:
@@ -271,7 +273,7 @@ def plot_combined_affect_and_trajectory(rows, max_state, show_components=True):
 
 
 if __name__ == "__main__":
-    from gdt_modular.envs.money_env import MoneyMDPEnv, money_discrepancy
     env = MoneyMDPEnv(max_state=5)
     agent = Agent(env=env, goal=5, planning=False, discrepancy_fn=money_discrepancy)
-    agent.run()
+    #agent.run()
+    run(agent)
