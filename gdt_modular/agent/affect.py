@@ -25,26 +25,27 @@ class AffectModel:
     
     def ad(self, feature_name):                          # Affect from Discrepancy Detection
         d = self.discrepancy_buffer[feature_name]
-        ad = self.v if d==0 else self.v*d
+        ad = self.v if d==0 else -self.v*d
         return ad
     
     def utilities(self):
         e = self.expectancy
         u = e*self.v
-        utilities = self.utility_matrix.append(u)
-        return u, utilities
+        self.utility_matrix = [u]
+        return u, self.utility_matrix
     
     def aas(self):
-        aas = max(self.utility_matrix)  # function can be changed
+        self.utilities()
+        aas = max(self.utility_matrix)  # TODO: this will always return the same value because. Fix
         return aas
     
-    def aff_comp(self, perceived_features):
+    def aff_comp(self, perceived_features, current_expectancy):
+        self.expectancy = current_expectancy
         self.discrepancy(perceived_features)
         ad_sum = 0
         for feature in self.targets.keys():
             ad = self.ad(feature)
             ad_sum += self.g*ad
-        self.utilities()
         aas = self.aas()
         aff_comp = (self.w1*ad_sum) + self.w2*aas
         return aff_comp, ad, aas

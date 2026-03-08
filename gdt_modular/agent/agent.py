@@ -9,28 +9,28 @@ class Agent:
         self.current_features = {}
 
         self.actions = env.actions 
-        self.p = env.transition_prob()
+        #self.p = env.transition_prob()
+        self.last_action_p = 0
         
 
     def decide(self):
+        probs = self.env.transition_prob()
+
         if self.actions == 1:
             action = 1
+            self.last_action_p = probs
         else:
             action = np.random.randint(1, self.actions + 1)
+            self.last_action_p = probs[action - 1]
 
-        outcome_state = self.env.step(action)
-
-        self.current_state = outcome_state
+        self.current_state = self.env.step(action)
         self.current_features = self.env.get_features()
 
         return self.current_state
     
-    def expectancy(self):
-        e = self.p
-        return e
     
     def get_affect(self):
-        aff_comp, ad, aas = self.affect_model.aff_comp(self.current_features)
+        aff_comp, ad, aas = self.affect_model.aff_comp(self.current_features, self.last_action_p)
         return aff_comp, ad, aas
 
 
