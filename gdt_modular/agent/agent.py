@@ -12,46 +12,47 @@ class Agent:
         self.current_features = {}
 
         self.actions = env.actions 
-        #self.p = env.transition_prob()
         self.last_action_p = 0
 
     def perceive(self):
         raw_features = self.env.get_features()
         if self.perception_filter:
-            # The filter handles the "Binary vs Gradual" logic externally
+            # This is the "Psychological Lens"
             self.current_features = self.perception_filter(raw_features)
-            return
-        if isinstance(raw_features, dict):
-            # Just ensure the values inside are floats
-            self.current_features = {k: float(v) for k, v in raw_features.items()}
         else:
-            val = raw_features[0] if isinstance(raw_features, list) else raw_features
-            self.current_features = {"feature value": float(val)}
+            # Default behavior if no lens is provided
+            self.current_features = {k: float(v) for k, v in raw_features.items()}
         
+    def set_policy(self, policy_type="perfect"):
+        if self.env.actions == 2:
+            if policy_type == "perfect":
+                self.beliefs = [0.0, 1.0]  # 100% Right (Action 2)
+            elif policy_type == "good":
+                self.beliefs = [0.2, 0.8]  # 80% Right
+            elif policy_type == "random":
+                self.beliefs = [0.5, 0.5]  # Coin flip
+        else:
+            # Fallback for single-action envs (like Dice)
+            self.beliefs = [1.0]
 
     def decide(self):
-        # If we have specific beliefs (Doors), use them. 
-        # Otherwise (Dice), ask the environment.
+        # Use established beliefs or fallback to env default
         probs = self.beliefs if len(self.beliefs) > 0 else self.env.transition_prob()
 
-        if self.actions == 1:
+        if self.env.actions == 1:
             action = 1
-            self.last_action_p = probs
+            self.last_action_p = probs[0] if isinstance(probs, (list, np.ndarray)) else probs
         else:
-            door_indices = np.arange(len(probs))
-            action_idx = np.random.choice(door_indices, p=probs) 
-            action = action_idx + 1
+            # Choose action based on the probability distribution
+            action_idx = np.random.choice(len(probs), p=probs)
+            action = action_idx + 1 # Actions are 1-indexed
             self.last_action_p = probs[action_idx]
 
-        self.current_state = self.env.step(action, target_dict=self.targets)
+        self.current_state = self.env.step(action)
         self.perceive()
-
         return self.current_state
     
-    
     def get_affect(self):
+        # We pass the subjective features and the expectancy of the action taken
         aff_comp, ad, aas = self.affect_model.aff_comp(self.current_features, self.last_action_p)
         return aff_comp, ad, aas
-
-
-        

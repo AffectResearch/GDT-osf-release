@@ -21,7 +21,7 @@ class Dice:
         self.outcome_space = np.arange(1, self.sides + 1)
 
 
-    def step(self):
+    def step(self, action=None):
         self.state = np.random.randint(1, self.sides + 1)
         return self.state
     

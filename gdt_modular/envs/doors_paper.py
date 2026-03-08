@@ -1,9 +1,9 @@
 import numpy as np
 
 class Doors:
-    def __init__(self, outcome_space, true_p_list):
-        self.p_list = true_p_list
-        self.actions = len(true_p_list)
+    def __init__(self, outcome_space, p_list):
+        self.p_list = p_list
+        self.actions = len(p_list)
         self.feature_map = {
             "success": {"goal_dim": 1.0},
             "failure": {"goal_dim": 0.0},
@@ -27,8 +27,6 @@ class Doors:
     def get_features(self):
         return self.feature_map[self.current_outcome]
     
-    def get_features(self):
-        return self.current_features
     
     def transition_prob(self):
         return self.p_list
