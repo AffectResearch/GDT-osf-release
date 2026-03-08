@@ -12,22 +12,22 @@ class Dice:
 
     def __init__(self, seed=None, sides=6):
         self.sides = sides if sides else np.random.default_rng(seed)
-        self.state = 0
+        self.state = 0 # Starting state
+        self.feature_map = {i: {"goal_dim": float(i)} for i in range(1, sides + 1)}
+        self.feature_map[0] = {"goal_dim": 0.0} # Pre-throw state
         self.seed = seed
         self.rng = np.random.default_rng(seed)
         self.actions = 1    # "throw"
         self.outcome_space = np.arange(1, self.sides + 1)
 
 
-    def step(self, action):
-        if self.state==0 and action==1:
-            self.state = self.rng.choice(self.outcome_space)
+    def step(self):
+        self.state = np.random.randint(1, self.sides + 1)
         return self.state
     
     def get_features(self):
-        if self.state == 0:
-            return {"feature value": None}
-        return {"feature value": self.state}
+        # Always returns the raw vector associated with the state
+        return self.feature_map[self.state]
     
     def reset (self):
         self.state = 0
