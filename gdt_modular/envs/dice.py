@@ -11,18 +11,22 @@ class Dice:
     # 1 action is possible (throw)
 
     def __init__(self, seed=None, sides=6):
-        self.sides = sides if sides else np.random.default_rng(seed)
+        self.sides = sides if sides is not None else 6
         self.state = 0 # Starting state
-        self.feature_map = {i: {"goal_dim": float(i)} for i in range(1, sides + 1)}
-        self.feature_map[0] = {"goal_dim": 0.0} # Pre-throw state
+        self.feature_map = {i: {"goal_dim": float(i - 1) if i > 1 else 0.0} for i in range(self.sides + 2)}
         self.seed = seed
         self.rng = np.random.default_rng(seed)
         self.actions = 1    # "throw"
-        self.outcome_space = np.arange(1, self.sides + 1)
+        self.outcome_space = np.arange(2, self.sides + 2)
 
 
     def step(self, action=None):
-        self.state = np.random.randint(1, self.sides + 1)
+        if self.state == 0:
+            self.state = 1  # s_start -> s_throw
+        elif self.state == 1:
+            self.state = self.rng.integers(2, self.sides + 2)   # s_throw -> roll the die (outcome states 2 through 7)
+        else:
+            self.state = 1  # s_outcome -> s_throw
         return self.state
     
     def get_features(self):
@@ -33,6 +37,6 @@ class Dice:
         self.state = 0
         return self.state
     
-    def transition_prob(self):
+    def transition_prob(self): # TODO: add transition=1 for s_start to s_throw
         p = 1/self.sides
         return p

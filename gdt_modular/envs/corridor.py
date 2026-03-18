@@ -1,10 +1,14 @@
 import numpy as np
 
 class Corridor:
-    def __init__(self, length=6):
-        self.length = length
-        self.state = 1  # Start at s_s (position 1)
-        self.actions = 2 # Action space: 1 = Left, 2 = Right
+    def __init__(self, seed=None length=5, trap_prob=0.1):
+        self.length = length    # total steps to reach s_e
+        self.state = 0  # Start at s_s (position 0)
+        self.trap_prob = self.trap_prob
+
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
+        self.actions = 1 # Action space: "Advance"
 
         self.feature_map = {
             1: {"goal_dim": 1.0},
