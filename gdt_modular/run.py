@@ -77,7 +77,7 @@ def run_doors_task(agent_knows_flip=False):
     
     return run_experiment(env, agent, trials=100, flip_trial=50, flip_beliefs=agent_knows_flip)
 
-def run_corridor_task(mode="gradual", agent_type="perfect"):
+def run_corridor_task(mode="gradual", agent_type="perfect", trap_prob=0.1):
     env = Corridor(length=6)
     
     if mode == "binary":
