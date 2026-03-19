@@ -31,6 +31,10 @@ class Corridor:
         # The agent only sees this vector, not the 'self.state' number
         return self.feature_map[self.state]
     
+    def is_terminal(self):
+        # Terminal if at the end (length) or in the trap (length + 1)
+        return self.state >= self.length
+    
     def reset(self):
         self.state = 0
         return self.state

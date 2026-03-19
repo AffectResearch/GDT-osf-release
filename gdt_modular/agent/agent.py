@@ -36,6 +36,10 @@ class Agent:
             self.beliefs = [1.0]
 
     def decide(self):
+        if self.env.is_terminal():
+            self.last_action_p = 0.0 # No more actions possible
+            return self.env.state
+        
         # Use established beliefs or fallback to env default
         probs = self.beliefs if len(self.beliefs) > 0 else self.env.transition_prob()
 

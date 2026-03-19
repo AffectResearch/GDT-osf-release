@@ -33,6 +33,10 @@ class Dice:
         # Always returns the raw vector associated with the state
         return self.feature_map[self.state]
     
+    def is_terminal(self):
+        # Terminal if we are in an outcome state (2-7)
+        return self.state >= 2
+    
     def reset (self):
         self.state = 0
         return self.state
