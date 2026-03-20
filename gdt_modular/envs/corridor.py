@@ -12,7 +12,7 @@ class Corridor:
 
         self.trap_state_idx = length +1     # Make the Trap State scalable with the length of the corridor
         self.feature_map = {i: {"goal_dim": float(i)} for i in range(self.length + 1)}  # Feature = index for every state
-        self.feature_map[self.length + 1] = {"goal_dim": 0.0}   # Trap State Feature = 0.0 for max discrepancy
+        self.feature_map[self.trap_state_idx] = {"goal_dim": -3.0}   # Trap State Feature = -3.0 for max discrepancy
 
     def step(self, action):
         if self.state >= self.length:

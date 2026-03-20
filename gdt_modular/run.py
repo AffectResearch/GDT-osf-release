@@ -37,7 +37,8 @@ def run_simulation(env, agent, num_episodes=10, max_steps=25):
             total, ad, aas = agent.get_affect()
             
             episode_log["affect"].append({"total": total, "ad": ad, "aas": aas})
-            episode_log["outcomes"].append(agent.current_state)
+            #episode_log["outcomes"].append(agent.current_state)
+            episode_log["outcomes"].append(env.get_features()["goal_dim"])
             step_count += 1
             
         all_data.append(episode_log)
@@ -66,34 +67,83 @@ def run_dice_task(mode="binary", num_throws=10):
     # Each throw is an episode. Max steps is small because Dice is a short cycle.
     return run_simulation(env, agent, num_episodes=num_throws, max_steps=2)
 
-def run_corridor_task(mode="gradual", num_walks=5):
+# Corridor Run Function
+def run_corridor_task(mode="gradual", seed=None,length=6, trap_prob=0.1):
     # Setup Env
-    env = Corridor(length=6, trap_prob=0.1)
+    env = Corridor(length=length, trap_prob=trap_prob, seed=seed)
+    targets = {"goal_dim": float(length)}
     
     # Setup Lens/Target
     if mode == "binary":
         # Target is "Success" (1.0)
-        targets = {"goal_dim": 1.0}
+        #targets = {"goal_dim": 1.0}
         def lens(raw):
-            # Only state 6 is perceived as 1.0
-            return {"goal_dim": 1.0 if raw["goal_dim"] == 6.0 else 0.0}
+            # Only state 6 is perceived as success with maximum feature distance (could also be 1.0)
+            val = float(length) if raw["goal_dim"] == float(length) else 0.0 
+            return {"goal_dim": val}
     else:
         # Target is the 5th position
-        targets = {"goal_dim": 5.0}
+        targets = {"goal_dim": float(length)}
         def lens(raw):
             # Gradual: perceive the raw distance/progress
             return raw
 
-    affect_model = AffectModel(v=1.0, targets=targets)
+    affect_model = AffectModel(v=1.0, targets=targets, w1=1.0, w2=1.0)
     agent = Agent(env, affect_model, targets, perception_filter=lens)
     
-    return run_simulation(env, agent, num_episodes=num_walks, max_steps=10)
+    return run_simulation(env, agent, num_episodes=1, max_steps=length+2)
 
 # --------- PLOTTING ------------
-def plot_affectvsoutcome(all_data, title="GDT Model", ylabel="Outcome Value", target_val=6):
+
+# Dice
+def plot_affectvsoutcome_dice(all_data, title="GDT Model", ylabel="Outcome Value", target_val=6):
     fig, ax1 = plt.subplots(figsize=(12, 6))
     
-    # --- 1. SUBSTITUTION: Flattening multiple episodes into one long list ---
+    flat_outcomes = []
+    flat_total = []
+    flat_ad = []
+    flat_aas = []
+    episode_separators = []
+    
+    current_step = 0
+    for ep in all_data:
+        flat_outcomes.extend(ep["outcomes"])
+        flat_total.extend([step["total"] for step in ep["affect"]])
+        flat_ad.extend([step["ad"] for step in ep["affect"]])
+        flat_aas.extend([step["aas"] for step in ep["affect"]])
+        
+        current_step += len(ep["outcomes"])
+        episode_separators.append(current_step - 0.5)
+
+    ax1.set_xlabel('Steps (Sequential Episodes)')
+    ax1.set_ylabel(ylabel, color='gray')
+    ax1.scatter(range(len(flat_outcomes)), flat_outcomes, color='gray', alpha=0.3, label="Actual Outcome")
+    ax1.axhline(y=target_val, color='green', linestyle='--', alpha=0.5, label=f"Goal ({target_val})")
+    ax1.set_ylim(-0.5, max(flat_outcomes + [target_val]) + 1)
+
+    for sep in episode_separators[:-1]:
+        ax1.axvline(x=sep, color='black', linestyle='-', alpha=0.1)
+
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('Affective Intensity')
+    ax2.plot(flat_total, color='blue', linewidth=2, label="Total Affect")
+    ax2.plot(flat_ad, color='red', linestyle=':', alpha=0.6, label="AD (Discrepancy)")
+    ax2.plot(flat_aas, color='orange', linestyle='-', alpha=0.6, label="AAS (Expectancy)")
+
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax2.legend(lines + lines2, labels + labels2, loc='upper left')
+
+    plt.title(title)
+    plt.tight_layout()
+    plt.show()
+
+
+# Corridor
+def plot_affectvsoutcome_corridor(all_data, mode="gradual", title="GDT Model", ylabel="Outcome Value", length=6, target_val=6):
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+    
+    # --- 1.Flattening multiple episodes into one long list ---
     # Instead of one list 'data["rolls"]', we build new lists by 
     # stitching all episodes together sequentially.
     flat_outcomes = []
@@ -113,23 +163,44 @@ def plot_affectvsoutcome(all_data, title="GDT Model", ylabel="Outcome Value", ta
         current_step += len(ep["outcomes"])
         episode_separators.append(current_step - 0.5)
 
-    # --- Axis 1: Environment Outcomes ---
-    ax1.set_xlabel('Total Steps (Episodes stitched together)')
-    ax1.set_ylabel(ylabel, color='gray')
+    steps = np.arange(len(flat_outcomes))
+
+    # We define the Y1 range (Position)
+    y1_min, y1_max = -4, 8 
+    # We define the Y2 range (Affect) to perfectly align: Affect = Position - 6
+    y2_min, y2_max = y1_min - 6, y1_max - 6 # Results in [-10, 2]
+
+    ax1.set_ylim(y1_min, y1_max)
+    ax1.set_xlim(-0.5, length + 1)
+
+    # Preparation
+    # 1. Neutral Baseline & "The Floor"
+    ax1.axhline(y=0, color='black', linestyle='-', alpha=0.3, linewidth=1)
+    # Fill the area below 0 to show the "Sub-baseline" failure zone
+    x_lims = ax1.get_xlim()
+    ax1.fill_between(x_lims, -4, 0, color='gray', alpha=0.1, label="Failure Zone")
+
+    # 2. The State Walking Line (Step Plot)
+    # This shows the progress clearly and stays flat if the agent is stuck/terminal
+    ax1.step(steps, flat_outcomes, where='post', color='gray', alpha=0.7, linewidth=2, label="Agent Path")
+    ax1.scatter(steps, flat_outcomes, color='gray', s=30) # Add dots at the joints
+
+    # 3. Fixed X-Axis (Lost Opportunity)
+    # We force the x-axis to show the full potential length of the corridor
+     
+    ax1.set_xlabel('Time Steps')
+    ax1.set_ylabel('Position / Feature Value', color='gray')
     
-    # --- 2. SUBSTITUTION: data["rolls"] -> flat_outcomes ---
+    # --- 2. flat_outcomes ---
     ax1.scatter(range(len(flat_outcomes)), flat_outcomes, color='gray', alpha=0.3, label="Actual Outcome")
     
     # Target line (using the target_val variable)
     ax1.axhline(y=target_val, color='green', linestyle='--', alpha=0.5, label=f"Target Goal ({target_val})")
-    ax1.set_ylim(-0.5, max(flat_outcomes + [target_val]) + 1)
-
-    # NEW: Vertical dividers to show where one episode ends and the next begins
-    for sep in episode_separators[:-1]:
-        ax1.axvline(x=sep, color='black', linestyle='-', alpha=0.1)
+    #ax1.set_ylim(min(flat_outcomes + [-3.5]), max(flat_outcomes + [target_val]) + 1)
 
     # --- Axis 2: Affective States ---
     ax2 = ax1.twinx()
+    ax2.set_ylim(y2_min, y2_max)
     ax2.set_ylabel('Affective Intensity')
 
     # --- 3. SUBSTITUTION: data["affect_scores"] variables -> flattened lists ---
@@ -142,7 +213,7 @@ def plot_affectvsoutcome(all_data, title="GDT Model", ylabel="Outcome Value", ta
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax2.legend(lines + lines2, labels + labels2, loc='upper left')
 
-    plt.title(title)
+    plt.title(f"{title} | Mode: {mode.upper()}")
     plt.tight_layout()
     plt.show()
 
@@ -219,14 +290,47 @@ def plot_affectvsoutcome(all_data, title="GDT Model", ylabel="Outcome Value", ta
 print("Simulating Dice...")
 dice_bin = run_dice_task(mode="binary")
 dice_grad = run_dice_task(mode="gradual")
-plot_affectvsoutcome(dice_bin, title="GDT Model", ylabel="Outcome Value", target_val=6)
-plot_affectvsoutcome(dice_grad, title="GDT Model", ylabel="Outcome Value", target_val=6)
+plot_affectvsoutcome_dice(dice_bin, title="GDT Model", ylabel="Outcome Value", target_val=6)
+plot_affectvsoutcome_dice(dice_grad, title="GDT Model", ylabel="Outcome Value", target_val=6)
 
 # # --- EXPERIMENT 2: DOORS (Probability Flip) ---
 # doors_data = run_doors_task(agent_knows_flip=False)
 # plot_affectvsoutcome(doors_data, title="Exp 3: Doors (Hidden Flip)", ylabel="Door Choice")
 
 # # --- EXPERIMENT 3: CORRIDOR POLICY COMPARISON ---
+
+# Choose 6 seeds. 
+seeds = [42, 7, 10, 15, 21, 99] 
+
+print("Simulating binary Corridor Case Studies...")
+
+for i, s in enumerate(seeds):
+    # Run one specific trajectory
+    single_walk_data = run_corridor_task(mode="binary", seed=s)
+    
+    # Plot it
+    plot_affectvsoutcome_corridor(
+        single_walk_data, 
+        mode="binary", 
+        title=f"Walk {i+1} (Seed: {s})", 
+        ylabel="Position (0-6)", 
+        target_val=6.0
+    )
+
+print("Simulating gradual Corridor Case Studies...")
+
+for i, s in enumerate(seeds):
+    # Run one specific trajectory
+    single_walk_data = run_corridor_task(mode="gradual", seed=s)
+    
+    # Plot it
+    plot_affectvsoutcome_corridor(
+        single_walk_data, 
+        mode="gradual", 
+        title=f"Walk {i+1} (Seed: {s})", 
+        ylabel="Position (0-6)", 
+        target_val=6.0
+    )
 # print("Simulating Corridor Policy Overlays...")
 # # Run and plot for Binary mode
 # binary_comparison = run_corridor_comparison_data(mode="binary")
