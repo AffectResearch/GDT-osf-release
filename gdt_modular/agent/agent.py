@@ -1,11 +1,12 @@
 import numpy as np
 
 class Agent:
-    def __init__(self, env, affect_model, targets, perception_filter=None):
+    def __init__(self, env, affect_model, targets, perception_filter=None, expectancy_filter=None):
         self.env = env
         self.affect_model = affect_model
         self.targets = targets
         self.perception_filter = perception_filter
+        self.expectancy_filter = expectancy_filter
         self.beliefs = []
 
         self.current_state = 0
@@ -15,13 +16,20 @@ class Agent:
         self.last_action_p = 0
 
     def perceive(self):
+        # 1. Update Features (Psychological Lens for AD)
         raw_features = self.env.get_features()
         if self.perception_filter:
-            # This is the "Psychological Lens"
             self.current_features = self.perception_filter(raw_features)
         else:
-            # Default behavior if no lens is provided
             self.current_features = {k: float(v) for k, v in raw_features.items()}
+        
+        # 2. Update Beliefs (Subjective Expectancy Lens for AAS)
+        if self.expectancy_filter:
+            # Pass the env to the filter to allow state-based discounting
+            self.beliefs = self.expectancy_filter(self.env)
+        else:
+            # Default to certain transitions if no filter is provided
+            self.beliefs = [1.0] if self.env.actions == 1 else self.env.transition_prob()
         
     def set_policy(self, policy_type="perfect"):
         if self.env.actions == 2:

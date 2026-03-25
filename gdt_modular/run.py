@@ -19,6 +19,8 @@ def run_simulation(env, agent, num_episodes=10, max_steps=25):
     for ep in range(num_episodes):
         env.reset()
         agent.perceive() # Initial state perception
+
+        agent.last_action_p = agent.beliefs[0]
         
         episode_log = {
             "outcomes": [],
@@ -68,28 +70,31 @@ def run_dice_task(mode="binary", num_throws=10):
     return run_simulation(env, agent, num_episodes=num_throws, max_steps=2)
 
 # Corridor Run Function
-def run_corridor_task(mode="gradual", seed=None,length=6, trap_prob=0.1):
-    # Setup Env
+def run_corridor_task(mode="gradual", agent_beliefs="accurate", seed=None, length=6, trap_prob=0.1):
     env = Corridor(length=length, trap_prob=trap_prob, seed=seed)
     targets = {"goal_dim": float(length)}
     
-    # Setup Lens/Target
-    if mode == "binary":
-        # Target is "Success" (1.0)
-        #targets = {"goal_dim": 1.0}
-        def lens(raw):
-            # Only state 6 is perceived as success with maximum feature distance (could also be 1.0)
+    # --- 1. Perception Lens (for AD) ---
+    def perception_lens(raw):
+        if mode == "binary":
             val = float(length) if raw["goal_dim"] == float(length) else 0.0 
             return {"goal_dim": val}
-    else:
-        # Target is the 5th position
-        targets = {"goal_dim": float(length)}
-        def lens(raw):
-            # Gradual: perceive the raw distance/progress
-            return raw
+        return raw # Gradual
+
+    # --- 2. Expectancy Lens (for AAS) ---
+    def expectancy_lens(e):
+        if agent_beliefs == "oblivious":
+            return [1.0] # Flat expectancy 
+        else: # accurate
+            # Formula: p_ij = (p')^n_steps [cite: 553]
+            p_prime = 1.0 - e.trap_prob
+            steps_to_go = e.length - e.state
+            return [p_prime ** steps_to_go]
 
     affect_model = AffectModel(v=1.0, targets=targets, w1=1.0, w2=1.0)
-    agent = Agent(env, affect_model, targets, perception_filter=lens)
+    agent = Agent(env, affect_model, targets, 
+                  perception_filter=perception_lens, 
+                  expectancy_filter=expectancy_lens)
     
     return run_simulation(env, agent, num_episodes=1, max_steps=length+2)
 
@@ -300,37 +305,42 @@ plot_affectvsoutcome_dice(dice_grad, title="GDT Model", ylabel="Outcome Value", 
 # # --- EXPERIMENT 3: CORRIDOR POLICY COMPARISON ---
 
 # Choose 6 seeds. 
+# Choose 6 seeds. 
 seeds = [42, 7, 10, 15, 21, 99] 
+belief_modes = ["oblivious", "accurate"]
 
-print("Simulating binary Corridor Case Studies...")
+# --- BINARY CORRIDOR ---
+print("Simulating Binary Corridor (Oblivious vs. Accurate)...")
+for belief in belief_modes:
+    print(f"  Mode: Binary | Beliefs: {belief}")
+    for i, s in enumerate(seeds):
+        # Pass the belief mode to your task runner
+        single_walk_data = run_corridor_task(mode="binary", agent_beliefs=belief, seed=s)
+        
+        plot_affectvsoutcome_corridor(
+            single_walk_data, 
+            mode="binary", 
+            title=f"Walk {i+1} (Seed: {s}) | Agent: {belief.capitalize()}", 
+            ylabel="Position (0-6)", 
+            target_val=6.0
+        )
 
-for i, s in enumerate(seeds):
-    # Run one specific trajectory
-    single_walk_data = run_corridor_task(mode="binary", seed=s)
-    
-    # Plot it
-    plot_affectvsoutcome_corridor(
-        single_walk_data, 
-        mode="binary", 
-        title=f"Walk {i+1} (Seed: {s})", 
-        ylabel="Position (0-6)", 
-        target_val=6.0
-    )
+# --- GRADUAL CORRIDOR ---
+print("Simulating Gradual Corridor (Oblivious vs. Accurate)...")
+for belief in belief_modes:
+    print(f"  Mode: Gradual | Beliefs: {belief}")
+    for i, s in enumerate(seeds):
+        single_walk_data = run_corridor_task(mode="gradual", agent_beliefs=belief, seed=s)
+        
+        plot_affectvsoutcome_corridor(
+            single_walk_data, 
+            mode="gradual", 
+            title=f"Walk {i+1} (Seed: {s}) | Agent: {belief.capitalize()}", 
+            ylabel="Position (0-6)", 
+            target_val=6.0
+        )
 
-print("Simulating gradual Corridor Case Studies...")
-
-for i, s in enumerate(seeds):
-    # Run one specific trajectory
-    single_walk_data = run_corridor_task(mode="gradual", seed=s)
-    
-    # Plot it
-    plot_affectvsoutcome_corridor(
-        single_walk_data, 
-        mode="gradual", 
-        title=f"Walk {i+1} (Seed: {s})", 
-        ylabel="Position (0-6)", 
-        target_val=6.0
-    )
+print("Finished all simulations!")
 # print("Simulating Corridor Policy Overlays...")
 # # Run and plot for Binary mode
 # binary_comparison = run_corridor_comparison_data(mode="binary")
