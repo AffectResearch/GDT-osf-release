@@ -28,8 +28,13 @@ class Agent:
             # Pass the env to the filter to allow state-based discounting
             self.beliefs = self.expectancy_filter(self.env)
         else:
-            # Default to certain transitions if no filter is provided
-            self.beliefs = [1.0] if self.env.actions == 1 else self.env.transition_prob()
+            env_probs = self.env.transition_prob() 
+            
+            if isinstance(env_probs, (list, np.ndarray)):
+                self.beliefs = env_probs
+            else:
+                # Fallback if transition_prob returns a single float
+                self.beliefs = [env_probs]
         
     def set_policy(self, policy_type="perfect"):
         if self.env.actions == 2:
@@ -65,6 +70,6 @@ class Agent:
         return self.current_state
     
     def get_affect(self):
-        # We pass the subjective features and the expectancy of the action taken
+        # Pass the subjective features and the expectancy of the action taken
         aff_comp, ad, aas = self.affect_model.aff_comp(self.current_features, self.last_action_p)
         return aff_comp, ad, aas

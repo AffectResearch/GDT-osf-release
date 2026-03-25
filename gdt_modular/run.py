@@ -54,10 +54,10 @@ def run_dice_task(mode="binary", num_throws=10):
     env = Dice()
     
     if mode == "binary":
-        targets = {"goal_dim": 1.0} # Target is 'Success'
+        targets = {"goal_dim": 6.0} # Target is 'Success'
         def lens(raw):
             # Only a 6 is perceived as a 1.0 (Success)
-            return {"goal_dim": 1.0 if raw["goal_dim"] == 6.0 else 0.0}
+            return {"goal_dim": 6.0 if raw["goal_dim"] == 6.0 else 0.0}
     else:
         targets = {"goal_dim": 6.0} # Target is the value 6
         def lens(raw):
@@ -124,7 +124,7 @@ def plot_affectvsoutcome_dice(all_data, title="GDT Model", ylabel="Outcome Value
     ax1.set_ylabel(ylabel, color='gray')
     ax1.scatter(range(len(flat_outcomes)), flat_outcomes, color='gray', alpha=0.3, label="Actual Outcome")
     ax1.axhline(y=target_val, color='green', linestyle='--', alpha=0.5, label=f"Goal ({target_val})")
-    ax1.set_ylim(-0.5, max(flat_outcomes + [target_val]) + 1)
+    
 
     for sep in episode_separators[:-1]:
         ax1.axvline(x=sep, color='black', linestyle='-', alpha=0.1)
@@ -134,6 +134,7 @@ def plot_affectvsoutcome_dice(all_data, title="GDT Model", ylabel="Outcome Value
     ax2.plot(flat_total, color='blue', linewidth=2, label="Total Affect")
     ax2.plot(flat_ad, color='red', linestyle=':', alpha=0.6, label="AD (Discrepancy)")
     ax2.plot(flat_aas, color='orange', linestyle='-', alpha=0.6, label="AAS (Expectancy)")
+    
 
     lines, labels = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
