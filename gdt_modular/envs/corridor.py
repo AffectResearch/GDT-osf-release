@@ -43,6 +43,8 @@ class Corridor:
         if state is None:
             state = self.state
 
+        if state == self.length:
+            return 1.0  # Goal state: Success is achieved/maintained
         if state < self.length:
-            return 1.0-self.trap_prob
-        return 0.0
+            return 1.0 - self.trap_prob
+        return 0.0      # Trap state: No way to reach the goal dim

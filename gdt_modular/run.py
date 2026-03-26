@@ -65,9 +65,32 @@ def run_dice_task(mode="binary", num_throws=10):
 
     affect_model = AffectModel(v=1.0, targets=targets, w1=1.0, w2=1.0)
     agent = Agent(env, affect_model, targets, perception_filter=lens)
+
+    all_data = []
+    for _ in range(num_throws):
+        env.reset()
+        agent.perceive()
+        
+        # 1. Baseline (Before throw)
+        total, ad, aas = agent.get_affect()
+        
+        # 2. THE THROW (Internal logic: 0 -> 1 -> Outcome)
+        env.step(1) # s_start -> s_throw
+        agent.decide() # s_throw -> Outcome + Perceive
+        
+        # 3. Log ONLY the outcome
+        res_total, res_ad, res_aas = agent.get_affect()
+        all_data.append({
+            "outcomes": [0.0, env.get_features()["goal_dim"]],
+            "affect": [
+                {"total": total, "ad": ad, "aas": aas},
+                {"total": res_total, "ad": res_ad, "aas": res_aas}
+            ]
+        })
+    return all_data
     
     # Each throw is an episode. Max steps is small because Dice is a short cycle.
-    return run_simulation(env, agent, num_episodes=num_throws, max_steps=2)
+    #return run_simulation(env, agent, num_episodes=num_throws, max_steps=2)
 
 # Corridor Run Function
 def run_corridor_task(mode="gradual", agent_beliefs="accurate", seed=None, length=6, trap_prob=0.1):
@@ -96,7 +119,28 @@ def run_corridor_task(mode="gradual", agent_beliefs="accurate", seed=None, lengt
                   perception_filter=perception_lens, 
                   expectancy_filter=expectancy_lens)
     
-    return run_simulation(env, agent, num_episodes=1, max_steps=length+2)
+    all_data = []
+    env.reset()
+    agent.perceive()
+    
+    episode_log = {"outcomes": [], "affect": []}
+
+    # Loop until Goal or Trap
+    while True:
+        # Record affect for the CURRENT state
+        total, ad, aas = agent.get_affect()
+        episode_log["affect"].append({"total": total, "ad": ad, "aas": aas})
+        episode_log["outcomes"].append(env.get_features()["goal_dim"])
+        
+        if env.is_terminal():
+            break
+            
+        agent.decide()
+        
+    all_data.append(episode_log)
+    return all_data
+    
+    #return run_simulation(env, agent, num_episodes=1, max_steps=length+2)
 
 # --------- PLOTTING ------------
 
@@ -305,7 +349,6 @@ plot_affectvsoutcome_dice(dice_grad, title="GDT Model", ylabel="Outcome Value", 
 
 # # --- EXPERIMENT 3: CORRIDOR POLICY COMPARISON ---
 
-# Choose 6 seeds. 
 # Choose 6 seeds. 
 seeds = [42, 7, 10, 15, 21, 99] 
 belief_modes = ["oblivious", "accurate"]
