@@ -6,6 +6,7 @@ from envs.doors_paper import Doors
 from envs.corridor import Corridor
 from agent.agent import Agent
 from agent.affect import AffectModel
+from pathlib import Path
 
 # --- GENERAL RUNNER ---
 def run_simulation(env, agent, num_episodes=10, max_steps=25):
@@ -102,7 +103,7 @@ def run_dice_task(mode="binary", num_throws=10, seed=None):
     #return run_simulation(env, agent, num_episodes=num_throws, max_steps=2)
 
 # Corridor Run Function
-def run_corridor_task(mode="gradual", agent_beliefs="accurate", seed=None, length=6, trap_prob=0.1):
+def run_corridor_task(mode="gradual", agent_beliefs="accurate", seed=None, length=5, trap_prob=0.1):
     env = Corridor(length=length, trap_prob=trap_prob, seed=seed)
     targets = {"goal_dim": float(length)}
     
@@ -253,9 +254,9 @@ def plot_affectvsoutcome_corridor(all_data, mode="gradual", ylabel="Outcome Valu
     steps = np.arange(len(flat_outcomes))
 
     # We define the Y1 range (Position)
-    y1_min, y1_max = -4, 8 
+    y1_min, y1_max = -4, 10 
     # We define the Y2 range (Affect) to perfectly align: Affect = Position - 6
-    y2_min, y2_max = y1_min - 6, y1_max - 6 # Results in [-10, 2]
+    y2_min, y2_max = y1_min - 5, y1_max - 5 # Results in [-10, 2]
 
     ax1.set_ylim(y1_min, y1_max)
     ax1.set_xlim(-0.5, length + 1)
@@ -319,24 +320,26 @@ def plot_stacked_corridor(all_walks_data, seeds, mode="binary", agent_type="obli
         steps = np.arange(len(outcomes))
 
         # --- Axis 1: Position ---
-        ax1.set_ylim(-4, 8) 
+        y1_min, y1_max = -6, 10            # Lowered to -5 to cleanly enclose the trap state drops
+        ax1.set_ylim(y1_min, y1_max) 
         # 2. Hard-limit the X-axis to the actual corridor length (7 steps)
-        ax1.set_xlim(-0.5, 7.5) 
+        ax1.set_xlim(-0.5, 6.5) 
         
         ax1.axhline(y=0, color='black', linestyle='-', alpha=0.3, linewidth=1)
-        ax1.fill_between([-0.5, 7.5], -4, 0, color='gray', alpha=0.1, label="Failure Zone")
+        ax1.fill_between([-0.5, 6.5], -4, 0, color='gray', alpha=0.1, label="Failure Zone")
         
         # Path and Dots
         ax1.step(steps, outcomes, where='post', color='gray', alpha=0.5, linewidth=2, label="Agent Path")
         ax1.scatter(steps, outcomes, color='gray', s=40, alpha=0.6)
         
         # Goal Line
-        ax1.axhline(y=6.0, color='green', linestyle='--', alpha=0.5, label="Goal (6)")
+        ax1.axhline(y=5.0, color='green', linestyle='--', alpha=0.5, label="Goal")
         ax1.set_ylabel(f"Seed {seed}\nPos", color='gray', fontsize=12)
 
-        # --- Axis 2: Affect (ALIGNED -6 to 0) ---
+        # --- Axis 2: Affect (ALIGNED -5 to 0) ---
         ax2 = ax1.twinx()
-        ax2.set_ylim(-10, 2)
+        y2_min, y2_max = -11, 5
+        ax2.set_ylim(y2_min, y2_max)
         ax2.set_ylabel('Affective Intensity', fontsize=12)
 
         ax2.plot(total, color='blue', linewidth=2.5, label="Total Affect")
@@ -358,7 +361,9 @@ def plot_stacked_corridor(all_walks_data, seeds, mode="binary", agent_type="obli
     plt.subplots_adjust(hspace=0.4) 
     plt.xlabel("Time Steps", fontsize=12)
     filename = f"Corridor_{mode.capitalize()}_{agent_type.capitalize()}_Stack.png"
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    current_dir = Path(__file__).resolve().parent
+    save_path = current_dir / filename
+    plt.savefig(str(save_path), dpi=300, bbox_inches='tight')
     plt.show()
 
 # def plot_affectvsoutcome(all_episodes_data, title="GDT Model", ylabel="Outcome Value"):
@@ -458,8 +463,8 @@ for belief in belief_modes:
             single_walk_data, 
             mode="binary", 
             #title=f"Walk {i+1} (Seed: {s}) | Agent: {belief.capitalize()}", 
-            ylabel="Position (0-6)", 
-            target_val=6.0
+            ylabel="Position (0-5)", 
+            target_val=5.0
         )
 
 # --- GRADUAL CORRIDOR ---
@@ -473,8 +478,8 @@ for belief in belief_modes:
             single_walk_data, 
             mode="gradual", 
             #title=f"Walk {i+1} (Seed: {s}) | Agent: {belief.capitalize()}", 
-            ylabel="Position (0-6)", 
-            target_val=6.0
+            ylabel="Position (0-5)", 
+            target_val=5.0
         )
 
 # --- stacked version ----
