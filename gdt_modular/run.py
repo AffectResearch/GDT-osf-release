@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from envs.dice import Dice
-from envs.doors_paper import Doors
+#from envs.doors_paper import Doors
 from envs.corridor import Corridor
 from agent.agent import Agent
 from agent.affect import AffectModel
@@ -33,14 +33,13 @@ def run_simulation(env, agent, num_episodes=10, max_steps=25):
         episode_log["affect"].append({"total": total, "ad": ad, "aas": aas})
         episode_log["outcomes"].append(env.state)
 
-        # The Episode Loop: continues until terminal (Goal or Trap)
+        # Episode Loop: continues until terminal (Goal or Trap)
         step_count = 0
         while not env.is_terminal() and step_count < max_steps: # Safety break
             agent.decide()
             total, ad, aas = agent.get_affect()
             
             episode_log["affect"].append({"total": total, "ad": ad, "aas": aas})
-            #episode_log["outcomes"].append(agent.current_state)
             episode_log["outcomes"].append(env.get_features()["goal_dim"])
             step_count += 1
             
@@ -509,3 +508,9 @@ for label, config in paper_groups.items():
                           agent_type=config["beliefs"])
 
 print("Finished all simulations!")
+
+
+# Quick RNG Stream Verification
+rng = np.random.default_rng(42)
+draws = [rng.random() for _ in range(6)]
+print("Seed 42 Draws:", draws)
