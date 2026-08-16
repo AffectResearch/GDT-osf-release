@@ -1,9 +1,6 @@
 # GDT-Computational-Model
 Computational implementations of the Goal Directed Theory (GDT) of behavior and affect (Moors, 2017).
 
-
-# Modular Corridor Stacks: Oblivious and Accurate Implementations
-
 This repository contains the official reference implementation and experiment replication suite for the paper *"A Computational Implementation of a Goal-Directed Theory of Affect"*.
 
 ## Setup & Requirements
