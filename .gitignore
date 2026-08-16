@@ -1,4 +1,10 @@
 __pycache__/
 .vscodium
 *.png
-
+.DS_Store
+.DS_Store?
+._*
+__MACOSX/
+.vscode/
+__pycache__/
+*.pyc
