@@ -15,11 +15,7 @@ class AffectModel:
     def discrepancy(self, perceived_features):
         for feature, target in self.targets.items():
             feature_val = perceived_features.get(feature, 0)
-            #if feature > target:
-            #    print(f"Warning: Feature ({feature}) > Target ({target})")
             d = target - feature_val
-            #if self.max_discrepancy is not None:
-            #    d = min(d, self.max_discrepancy)
             self.discrepancy_buffer[feature] = d
         return self.discrepancy_buffer
     
@@ -36,7 +32,7 @@ class AffectModel:
     
     def aas(self):
         self.utilities()
-        aas = max(self.utility_matrix)  # TODO: this will always return the same value because. Fix
+        aas = max(self.utility_matrix)
         return aas
     
     def aff_comp(self, perceived_features, current_expectancy):

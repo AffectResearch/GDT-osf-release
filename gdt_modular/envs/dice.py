@@ -1,5 +1,5 @@
 # ---- ENVIRONMENTs ----
-# The agent can interact with 3 environments: Dice, Doors, CorriDOOR
+# The agent can interact with 2 environments: Dice and Corridor
 
 # -- DICE --
 # In the Dice environment, the agent can throw a dice and will receive a number back. The target is always f = 5. Goal Importance is 1. 
@@ -7,7 +7,7 @@
 import numpy as np
 
 class Dice:
-    # 7 states are possible, with s being the starting state (before throwing) and a-f are the outcome states (Dice showing 1-6)
+    # 8 states are possible, with s being the starting state (before throwing), throw the state in which the agent throws and a-f are the outcome states (Dice showing 1-6)
     # 1 action is possible (throw)
 
     def __init__(self, seed=None, sides=6):
