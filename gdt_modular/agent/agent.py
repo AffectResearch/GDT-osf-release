@@ -68,12 +68,12 @@ class Agent:
         self.current_state = self.env.step(action)
         self.perceive()
 
-        if self.env.is_terminal():
+        #if self.env.is_terminal():
             # If the environment has a transition_prob of 0 at terminal
-            self.last_action_p = self.env.transition_prob() 
-        else:
+        #    self.last_action_p = self.env.transition_prob() 
+        #else:
             #   Otherwise, it's the best possible expectancy from here
-            self.last_action_p = max(self.beliefs) if isinstance(self.beliefs, list) else self.beliefs
+        self.last_action_p = max(self.beliefs) if isinstance(self.beliefs, list) else self.beliefs
 
         return self.current_state
     
