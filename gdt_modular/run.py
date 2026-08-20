@@ -7,6 +7,14 @@ from agent.agent import Agent
 from agent.affect import AffectModel
 from pathlib import Path
 
+# --- DIRECTORY & SAVE SETUP ---
+PLOTS_DIR = Path(__file__).resolve().parent / "plots"
+PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+
+def save_figure(fig, filename_base):
+    for fmt in ["png", "svg", "pdf"]:
+        fig.savefig(PLOTS_DIR / f"{filename_base}.{fmt}", dpi=300, bbox_inches='tight')
+
 # --- GENERAL RUNNER ---
 def run_simulation(env, agent, num_episodes=10, max_steps=25):
     """
@@ -216,6 +224,9 @@ def plot_affectvsoutcome_dice(all_data, mode=None, seed=None, ylabel="Outcome Va
                      fontsize=14, pad=15)
 
     plt.tight_layout()
+    # Save PNG, SVG, PDF
+    filename_base = f"Dice_{mode.capitalize()}_Seed_{seed}"
+    save_figure(fig, filename_base)
     plt.show()
 
 
@@ -350,10 +361,8 @@ def plot_stacked_corridor(all_walks_data, seeds, mode="binary", agent_type="obli
     # 3. Manual spacing adjustment to prevent vertical overlap
     plt.subplots_adjust(hspace=0.4) 
     plt.xlabel("Time Steps", fontsize=12)
-    filename = f"Corridor_{mode.capitalize()}_{agent_type.capitalize()}_Stack.png"
-    current_dir = Path(__file__).resolve().parent
-    save_path = current_dir / filename
-    plt.savefig(str(save_path), dpi=300, bbox_inches='tight')
+    filename_base = f"Corridor_{mode.capitalize()}_{agent_type.capitalize()}_Stack"
+    save_figure(fig, filename_base)
     plt.show()
 
  # --- RUN ---
